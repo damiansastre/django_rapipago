@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from .models import Customer, Invoice, PAYED, REFUNDED, PENDING
+from .exceptions import RapiPagoResponseCode, RapiPagoException
 import datetime
 
 
@@ -76,21 +77,28 @@ class QuerySerializer(serializers.Serializer):
         try:
             return Customer.objects.get(external_id=value)
         except Customer.DoesNotExist:
-            raise serializers.ValidationError('Client does not exist (code 7)')
+            raise RapiPagoException(RapiPagoResponseCode.CLIENT_DOES_NOT_EXIST)
 
     def to_representation(self, value):
+        reponse_code = RapiPagoResponseCode.OK
         payload = {}
         customer = value['id_clave']
         payload['id_clave'] = customer.external_id
         payload['nombre'] = customer.name
         payload['apellido'] = customer.last_name
         payload['cod_trx'] = value['cod_trx']
-        payload['msg'] = 'Trx ok'
-        payload['codigo_respuesta'] = '0' # Change for real result.
+        payload['msg'] = reponse_code.description
+        payload['codigo_respuesta'] = reponse_code.code
         payload['dato_adicional'] = 'Dato'
-        payload['facturas'] = customer.invoices.all()
+        payload['facturas'] = customer.invoices.filter(status=PENDING)
 
         return QueryResponseSerializer(payload).data
+
+    def validate(self, data):
+        customer = data['id_clave']
+        if not customer.invoices.filter(status=PENDING).exists():
+            raise RapiPagoException(RapiPagoResponseCode.NO_INVOICES_AVAILABLE)
+        return data
 
 
 class QueryResponseSerializer(serializers.Serializer):
@@ -119,7 +127,7 @@ class PaymentSerializer(serializers.Serializer):
         try:
             return Customer.objects.get(external_id=value)
         except Customer.DoesNotExist:
-            raise serializers.ValidationError('Client does not exist (code 7)')
+            raise RapiPagoException(RapiPagoResponseCode.CLIENT_DOES_NOT_EXIST)
 
     def validate_importe(self, value):
         return float(value)
@@ -129,13 +137,12 @@ class PaymentSerializer(serializers.Serializer):
             invoice = Invoice.objects.get(customer=data['id_numero'],
                                           barcode=data['barra'])
         except Invoice.DoesNotExist:
-            raise serializers.ValidationError('Invoice does not exist (code 6)')
+            raise RapiPagoException(RapiPagoResponseCode.NO_INVOICES_AVAILABLE)
         else:
             if invoice.status == PAYED:
-                raise serializers.ValidationError('Invalid Operation (5)')
+                raise RapiPagoException(RapiPagoResponseCode.INVALID_OPERATION)
             if invoice.status == REFUNDED:
-                raise serializers.ValidationError('Invoice has been reversed (code 3)')
-
+                raise RapiPagoException(RapiPagoResponseCode.ALREADY_REVERSED)
         invoice.status = PAYED
         invoice.payment_id = data['cod_trx']
         invoice.payment_date = timezone.now()
@@ -147,8 +154,8 @@ class PaymentResponseSerializer(serializers.ModelSerializer):
     cod_trx = serializers.CharField(max_length=22, source='payment_id')
     barra = serializers.CharField(max_length=22, source='barcode')
     fecha_hora_operacion = serializers.DateTimeField(format='%Y%m%d %H:%M:%S', source='payment_date')
-    codigo_respuesta = serializers.CharField(default='0')
-    msg = serializers.CharField(default='Trx ok')
+    codigo_respuesta = serializers.CharField(default=RapiPagoResponseCode.OK.code)
+    msg = serializers.CharField(default=RapiPagoResponseCode.OK.description)
 
     class Meta:
         model = Invoice

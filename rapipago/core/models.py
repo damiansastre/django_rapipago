@@ -11,7 +11,7 @@ class Customer(models.Model):
     additional_data = models.CharField(max_length=30, null=True, blank=True)
 
     def __str__(self):
-        return '[{}] Name={} LastName={}'.format(self.external_id, self.name, self.last_name)
+        return '[{}]: {} {}'.format(self.external_id, self.name, self.last_name)
 
 
 class Invoice(models.Model):
@@ -34,9 +34,10 @@ class Invoice(models.Model):
         return '{:011.2f}'.format(self.amount)
 
     def __str__(self):
-        return '[{}] Name={} LastName={}: {}'.format(self.barcode,
+        return '[{}] {} {}: {} : {}'.format(self.barcode,
                                                      self.customer.name,
                                                      self.customer.last_name,
-                                                     self.amount)
+                                                     self.amount,
+                                                     self.status)
 
 
