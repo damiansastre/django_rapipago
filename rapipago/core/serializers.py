@@ -35,7 +35,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
         data['customer'] = data.pop('customer_external_id')
         return data
 
-class ReadOnlyInvoiceSerializer(serializers.ModelSerializer):
+
+class QueryInvoiceSerializer(serializers.ModelSerializer):
     id_numero = serializers.CharField(source='id')
     fecha_vencimiento = serializers.DateTimeField(source='expiration_date', format="%Y-%m-%d")
     fecha_emision = serializers.DateTimeField(source='creation_date', format="%Y-%m-%d")
@@ -55,16 +56,22 @@ class ReadOnlyInvoiceSerializer(serializers.ModelSerializer):
         return obj.extra_data if obj.extra_data else ''
 
 
+class ReadOnlyInvoiceSerializer(QueryInvoiceSerializer):
+
+    class Meta:
+        model = Invoice
+        fields = ['external_id', 'expiration_date', 'creation_date', 'amount', 'barcode', 'extra_data', 'status']
+        read_only_fields =['external_id', 'expiration_date', 'creation_date', 'amount', 'barcode', 'extra_data', 'status']
+
+
 class ReadOnlyFullCustomerSerializer(serializers.ModelSerializer):
-    id_clave = serializers.CharField(source='external_id')
-    nombre = serializers.CharField(source='name')
-    apellido = serializers.CharField(source='last_name')
-    facturas = ReadOnlyInvoiceSerializer(source='invoices', many=True)
+
+    invoices = ReadOnlyInvoiceSerializer(many=True)
 
     class Meta:
         model = Customer
-        fields = ['id_clave', 'nombre', 'apellido', 'facturas']
-        read_only_fields = ['id_clave', 'nombre', 'apellido', 'facturas']
+        fields = ['id', 'external_id', 'name', 'last_name', 'invoices']
+        read_only_fields = ['external_id', 'name', 'last_name', 'invoices']
 
 
 class QuerySerializer(serializers.Serializer):
@@ -109,7 +116,7 @@ class QueryResponseSerializer(serializers.Serializer):
     codigo_respuesta = serializers.CharField()
     msg = serializers.CharField()
     dato_adicional = serializers.CharField(allow_blank=True)
-    facturas = ReadOnlyInvoiceSerializer(many=True)
+    facturas = QueryInvoiceSerializer(many=True)
 
 
 class PaymentSerializer(serializers.Serializer):
@@ -143,11 +150,13 @@ class PaymentSerializer(serializers.Serializer):
                 raise RapiPagoException(RapiPagoResponseCode.INVALID_OPERATION)
             if invoice.status == REFUNDED:
                 raise RapiPagoException(RapiPagoResponseCode.ALREADY_REVERSED)
+
         invoice.status = PAYED
         invoice.payment_id = data['cod_trx']
         invoice.payment_date = timezone.now()
         invoice.save()
         return invoice
+
 
 class PaymentResponseSerializer(serializers.ModelSerializer):
     id_numero = serializers.CharField(source='customer.external_id')

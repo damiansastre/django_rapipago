@@ -4,6 +4,7 @@ PENDING = 0
 PAYED = 1
 REFUNDED = -1
 
+
 class Customer(models.Model):
     external_id = models.CharField(max_length=255, unique=True)
     name = models.CharField(max_length=100)
@@ -11,7 +12,7 @@ class Customer(models.Model):
     additional_data = models.CharField(max_length=30, null=True, blank=True)
 
     def __str__(self):
-        return '[{}]: {} {}'.format(self.external_id, self.name, self.last_name)
+        return '[{}] {} {}'.format(self.external_id, self.name, self.last_name)
 
 
 class Invoice(models.Model):
@@ -35,9 +36,9 @@ class Invoice(models.Model):
 
     def __str__(self):
         return '[{}] {} {}: {} : {}'.format(self.barcode,
-                                                     self.customer.name,
-                                                     self.customer.last_name,
-                                                     self.amount,
-                                                     self.status)
+                                            self.customer.name,
+                                            self.customer.last_name,
+                                            self.amount,
+                                            self.INVOICE_CHOICES[self.status][1])
 
 

@@ -1,13 +1,12 @@
 from rest_framework.views import exception_handler
-from rest_framework import serializers
 from rest_framework.response import Response
 from django.conf import settings
 from collections import namedtuple
 
 RapiPagoResponseItem = namedtuple('RapiPagoExceptionItem', ['code', 'description'])
 
-class RapiPagoResponseCode:
 
+class RapiPagoResponseCode:
     OK = RapiPagoResponseItem("0", "Trx ok")
     DB_ERROR = RapiPagoResponseItem("1", "Error en BD")
     DUPLICATED_KEY = RapiPagoResponseItem("2", "Clave Duplicada")
@@ -22,6 +21,7 @@ class RapiPagoResponseCode:
     USER_HAS_NO_PERMISSION = RapiPagoResponseItem("11", "Usuario no habilitado para operar")
     OUT_OF_BUSINESS_HOURS = RapiPagoResponseItem("13", "Transaccion fuera de Horario")
 
+
 class RapiPagoException(Exception):
     """Custom Exceptions for RapiPago Requests"""
 
@@ -29,8 +29,10 @@ class RapiPagoException(Exception):
         self.message = code
         super().__init__(self.message)
 
+
 def is_rapipago(url):
     return 'STO' in url
+
 
 def custom_exception_handler(exc, context):
     # Call REST framework's default exception handler first,
@@ -42,7 +44,7 @@ def custom_exception_handler(exc, context):
         try:
             rapipago_context.pop('canal')
             rapipago_context.pop('importe')
-        except:
+        except Exception as e:
             pass
 
         if isinstance(exc, RapiPagoException):
@@ -59,9 +61,9 @@ def custom_exception_handler(exc, context):
 
             if settings.DEBUG:
                 rapipago_context['debug'] = exc.get_full_details()
+
         return Response(rapipago_context)
 
-            # Now add the HTTP status code to the response.
     if response is not None:
         response.data['status_code'] = response.status_code
 
